@@ -1,0 +1,422 @@
+---
+title: "script2"
+author: "Hamady GACKOU"
+date: "2024-12-11"
+output:
+  output: html_document
+  pdf_document: default
+  always_allow_html: true
+---
+
+```{r}
+library(TSstudio)
+library(tidyverse)
+     
+```
+
+```{r}
+#1 : Introduction 
+
+data("USgas")
+
+ts.plot(
+  USgas, main="", ylab=""
+)
+length(USgas)
+
+
+```
+
+```{r}
+#2 : Creation d'une ts fictive 
+
+my_ts <- ts(
+  data=1:60,
+  start =c(2010,1),
+  end = c(2014,12),
+  frequency = 12
+)
+
+my_ts
+
+
+ts_info(my_ts)
+
+head(my_ts, 60)
+```
+
+```{r}
+#3 : Transformation d'une dataframe en un objet  Ts 
+
+data("US_indicators")
+ 
+head(US_indicators)
+
+vehicle_sales <- US_indicators %>% select(Date, `Vehicle Sales`)  %>%  arrange(Date)
+
+point_depart <- c(year(min(vehicle_sales$Date)), month(min(vehicle_sales$Date)))
+frequence = 12
+
+vehicle_sales_ts <- ts(
+  data =vehicle_sales$`Vehicle Sales`,
+  start = point_depart,
+  frequency = frequence
+  
+)
+
+vehicle_sales_ts
+class(vehicle_sales_ts)
+ts_info(vehicle_sales_ts)
+
+summary(vehicle_sales_ts)
+
+US_indicators_mts <- US_indicators %>% arrange(Date) %>% select(-Date)
+
+vehicle_sales_mts <- ts(
+  data =US_indicators_mts,
+  start =point_depart,
+  frequency = frequence
+)
+print(vehicle_sales_mts)
+class(vehicle_sales_mts)
+summary(vehicle_sales_mts)
+
+ts_info(vehicle_sales_mts)
+```
+
+```{r}
+#4 : Purpose : Aggregation des series 
+ts_USgas_restreint <- window(
+  USgas,
+  start = c(2010, 1),
+  end <- c(2015, 4), 
+  frequency =12
+)
+
+ts_info(ts_USgas_restreint)
+# Aggregation 
+year_USgas <- aggregate(
+  USgas , 
+  nfrequency =1, 
+  FUN="min"
+) 
+head(year_USgas)
+ts_info(year_USgas)
+
+```
+
+```{r}
+#5: Purposes : Comment créer des séries lag ( retardées)  et des séries avancées(lead)
+library(stats)
+# Série lag et série lead 
+
+USgas_year_lag1 <- stats::lag(year_USgas, k=1)
+ts_info(USgas_year_lag1)
+
+US_gas_lead1 <- stats::lag(year_USgas, k=3)
+
+ts_info(US_gas_lead1)
+
+```
+
+```{r}
+#6 : Décomposition temporelle des séries temporelles :
+
+data("USVSales")
+ts_info(USVSales)
+head(USVSales)
+ts_plot(USVSales)
+
+# Décompostionn  : 
+usv_decompostion <- stats::decompose(USVSales)
+str(usv_decompostion)
+plot(usv_decompostion)
+# Avec la méthode de la library  TSstudio 
+ts_decompose(USVSales)
+
+```
+
+```{r}
+#7: Visualisation statique et interactive d'une série temporelle 
+library(dygraphs)
+
+# Série Univariée avec plot.ts()
+plot.ts(
+  vehicle_sales_ts,
+  main = "Ventes mensuelles totales des vehicules des aux USA  "
+  , xlab ="Date",
+   ylab= "Milliers de vehicules "
+)
+
+#Série multiivariée avec plot.ts()
+plot.ts(
+  vehicle_sales_mts,
+  main ="Ventes mensuelles totales des vehicules des aux USA VS  Taux de chomage",
+)
+
+# Visualtion interactive avec dygraphs : Série Univarié 
+dygraph(
+  vehicle_sales_ts,
+  main = "Ventes mensuelles totales des vehicules des aux USA  "
+  , xlab ="Date",
+   ylab= "Milliers de vehicules "
+  
+) %>% dyRangeSelector()
+
+colnames(vehicle_sales_mts) <- gsub(" ", "_", colnames(vehicle_sales_mts)) # Pour remplacer les espaces dans les noms des colonnes par des "_"
+# Visualtion interactive avec dygraphs : Série multi-varié 
+dygraph(
+  vehicle_sales_mts,main ="Ventes mensuelles totales des vehicules des aux USA VS  Taux de chomage") %>% 
+  dyAxis("y", label= "Ventes de voitures ") %>%
+  dyAxis("y2", label ="Taux de chomage") %>%
+  dySeries("Vehicle_Sales",  axis = "y", color ="green") %>%
+  dySeries("Unemployment_Rate", axis ="y2", color ="red")%>%
+  dyLegend(width =400) %>%
+  dyRangeSelector()
+
+ts_plot(
+  vehicle_sales_ts,
+  title = "Ventes mensuelles totales des véhicules aux USA",
+  Xtitle = "Temps",
+  Ytitle = "Milliers de vehicules ",
+  slider=TRUE
+)
+
+    
+```
+
+```{r}
+#8 : Modélisation avec ARIMA et Analyse des résudis    
+
+
+
+ts_plot(USgas)
+USgas_partitions <- ts_split(USgas)
+
+
+train <- USgas_partitions$train
+test <- USgas_partitions$test
+
+ts_info(USgas)
+ts_info(train)
+ts_info(test)
+
+
+library(forecast)
+
+model <- auto.arima(train)
+
+model 
+
+```
+
+```{r}
+# 9: Comment évaluer la performance d'un modèle ARIMA  
+checkresiduals(model)
+
+# Prédictions sur les données de test
+
+fc <- forecast(model, h=length(test))
+
+accuracy(fc, test)
+
+new_model <- auto.arima(USgas)
+
+previsions <- forecast(new_model, h=12)
+
+previsions
+
+#  Graphique :  Actual ,  Fitted  , Forcasted 
+
+test_forecast(
+  actual = USgas,
+  forecast.obj = fc,
+  test = test
+)
+
+```
+
+```{r}
+#10:  Machine Learning pour les séries temporelles et feature Enginneering 
+
+# Librairie Nécéssaire à importer 
+
+library(TSstudio)
+library(dplyr)
+library(psych)
+library(lubridate)
+library(rpart)
+library(rpart.plot)
+
+
+######################################## Analyse   Exploratoire  #######################################
+
+# Chargément des données 
+data(USVSales)
+ts_info(USVSales)
+str(USVSales)
+
+
+# Visualisation de la Série 
+
+ts_plot(
+  USVSales,
+  title = "US Total monthly vehicle Sales  ",
+  Ytitle = "Thousands of units",
+  Xtitle = "Year"
+        )
+
+# Lags de la série 
+ts_lags(USVSales)
+
+###################################  Feature Engineering #####################################
+df <- ts_to_prophet(USVSales)
+
+names(df)<- c("date", "y")
+
+df_eng <- df %>% 
+  mutate(
+    lag12 =lag(y, n=12),
+    month = as.integer(format(date, "%m")),
+    weekday = format(date, "%A"), 
+    IsWeekend = weekday %in% c("samedi", "dimanche")
+  ) %>%
+filter(!is.na(lag12))
+
+df_eng
+
+
+##################### Données d'entrainement #############################""
+h<- 12
+train_df <- df_eng[1:(nrow(df_eng)-h),]
+test_df <- df_eng[(nrow(df_eng)-h +1):nrow(df_eng),]
+
+########################### Modèle de base : Régréssion  ##############################
+
+# Matrice de corrélation  
+
+cor(train_df[c("y", "lag12", "month", "IsWeekend")])
+
+# Visualisation des corrélations 
+pairs.panels(train_df[c("y", "lag12", "month", "IsWeekend")])
+
+lr <- lm(
+  y ~ lag12+month+ weekday+IsWeekend,
+  data=train_df
+)
+
+summary(lr)
+
+# Prédictions sur les données de test 
+test_df$lr_hat <- predict(lr , newdata = test_df)
+ts_plot(
+  test_df[c("date", "y", "lr_hat")],
+  title = "Total vehicles sales - Actual vs Prediction (Linear Regression)"
+)
+
+mape_lr <-  mean(abs(test_df$y -test_df$lr_hat))/test_df$y
+mape_lr
+
+```
+
+```{r}
+# 11 : Modéliser une série temporelle avec un arbre de décision 
+
+ rpart_model <- rpart(
+   y~.,
+   data = train_df %>% select(-date)
+ )
+
+print(rpart_model)
+summary(rpart_model)
+
+
+
+rpart.plot(rpart_model, digits = 4)
+
+# Prédictions sur les données de Test
+# 
+test_df$tree_hat <- predict(
+  rpart_model, newdata  = test_df %>% select(-date)
+)
+# Matrice de correlation  : Valeurs predites Versus Valeurs réelles
+cor(test_df$tree_hat, test_df$y)
+MAPE <- function(actual , predicted){
+  mean(abs(actual-predicted))/actual
+}
+
+
+map_tree <- MAPE(test_df$y,test_df$tree_hat)
+
+print(map_tree)
+
+map_tree < mape_lr
+
+ts_plot(
+  test_df[c("date", "y", "tree_hat")],
+  title = "Total vehicles sales - Actual vs Prediction (Decision Trees)"
+)
+```
+
+```{r}
+# 12 : Calcul des prévisions ( prédictions dans le futur d'une série temporelle)
+############################      Prévision     ####################################################"
+h <- 12
+forecast_df <- data.frame(
+  date =seq.Date(from= max(df$date)+months(1), length.out = h , by ="month")
+)
+
+
+forecast_df$lag12 <- tail(df$y, 12)
+
+forecast_df <- forecast_df %>% 
+  mutate(
+    month = as.integer(format(date, "%m")),
+    weekday = format(date, "%A"),
+    IsWeekend = weekday %in% c("samedi", "dimanche")
+  )
+
+forecast_df
+
+
+
+
+futurs_ventes <- predict(lr,
+           newdata = forecast_df              
+                         )
+futurs_ventes
+
+
+
+
+
+
+```
+
+```{r}
+# Facebook Prophet 
+library(prophet)
+
+# Créer un dataframe avec les données temporelles 
+df <- data.frame (
+  ds = seq( as.Date('2023-01-01'), by ='month', length.out = 12),
+  y= c(10,20,30,40,50,60,70,80,90,100,110,120)
+)
+
+model <- prophet(df)
+future <- make_future_dataframe(
+  model,
+  periods = 6,
+  freq ="month"
+)
+
+previsions <- predict(model , future)
+plot(model ,previsions )
+
+prophet_plot_components(model, previsions)
+
+
+
+
+
+```
